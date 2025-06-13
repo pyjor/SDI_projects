@@ -19,7 +19,7 @@ import io
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 # Load your prompt from a .txt file
-PROMPT_FILE = "receipt_prompt.txt"
+PROMPT_FILE = "webapp/receipt_prompt.txt"
 with open(PROMPT_FILE, "r", encoding="utf-8") as f:
     RECEIPT_PROMPT = f.read()
 
