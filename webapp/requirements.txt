@@ -1,0 +1,7 @@
+streamlit
+openai
+opencv-python-headless
+pillow
+pandas
+pdf2image
+python-dotenv
