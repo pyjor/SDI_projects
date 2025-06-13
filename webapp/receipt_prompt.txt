@@ -169,5 +169,5 @@ This is the total of the receipt, read the receipt and identify the TOTAL AMOUNT
 
 Column 8: “Payment Method”
 
-When please identify the payment method, this can be either Cash or Card, If it is cash just fill the field with “Cash” if it was paid with credit card, identify the last 4 digits of the CC in this format: Visa CC(***7342).  If  the payment method is not specified fill this field with “Not specified”. Most of times will be with cards.
+When please identify the payment method, this can be either Cash or Card, If it is cash just fill the field with “Cash” if it was paid with credit card, identify the last 4 digits of the CC in this format: Credit Card(***7342).  If  the payment method is not specified fill this field with “Not specified”. Most of times will be with cards.
 """
