@@ -15,11 +15,9 @@ import tempfile
 import io
 
 # ======= CONFIG =======
-# (Assumes you use Streamlit secrets for security!)
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-# Load your prompt from a .txt file
-PROMPT_FILE = "webapp/receipt_prompt.txt"
+PROMPT_FILE = "receipt_prompt.txt"
 with open(PROMPT_FILE, "r", encoding="utf-8") as f:
     RECEIPT_PROMPT = f.read()
 
@@ -36,7 +34,7 @@ def extract_json_from_response(text_response):
 def parse_receipt_with_openai(image_bytes, prompt):
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
     response = openai.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1-mini",
         messages=[
             {"role": "system", "content": prompt},
             {
@@ -75,27 +73,32 @@ def crop_receipt_image(image_bytes):
     is_success, buffer = cv2.imencode(".jpg", cropped)
     return buffer.tobytes() if is_success else image_bytes
 
-def rename_file(data, who, ext):
+def rename_file(data, ext):
     def clean(s): return "".join([c for c in str(s) if c.isalnum() or c in "-_ "])
-    date = data.get('Date', '') or 'nodate'
-    payee = data.get('Name', '') or 'nopayee'
-    ref = data.get('Ref', '') or 'noref'
-    project = data.get('Project', '') or 'noproject'
-    new_name = f"{date} {clean(payee)} Inv {clean(ref)} – {clean(project)} {clean(who)} Reimbursement{ext}"
+    
+    date = data.get('Date', '') or ' '
+    payee = data.get('Name', '') or ' '
+    ref = data.get('Ref', '') or ' '
+    project = data.get('Project', '') or ' '
+    payment_method = data.get('Payment Method', '') or ''
+    
+    match = re.search(r"\*+(\d{4})", payment_method)
+    last4 = match.group(1) if match else "XXXX"
+    
+    new_name = f"{date} CC{last4} {clean(payee)} Inv {clean(ref)} - {clean(project)}{ext}"
     return new_name
 
 # ========== STREAMLIT APP UI ==========
 
-st.title("SDI - AI Powered Reimbursement")
-st.markdown("Upload your receipts (images or PDFs), enter the name of the person asking for reimbursement, and download. First Microservice for SDI developed by Jorge")
+st.title("Receipt Parser – Cropping + Renaming")
+st.markdown("Upload receipts. We'll crop them, extract the relevant info, rename the file, and give you everything in a ZIP + Excel report.")
 
 with st.form("upload_form"):
     uploaded_files = st.file_uploader("Upload receipts (images or PDFs)", type=["jpg", "jpeg", "png", "webp", "pdf"], accept_multiple_files=True)
-    who = st.text_input("Who is asking for this reimbursement?")
     submitted = st.form_submit_button("Process Receipts")
 
-if submitted and uploaded_files and who:
-    with st.spinner("Processing files, this may take a minute..."):
+if submitted and uploaded_files:
+    with st.spinner("Processing receipts..."):
         out_dir = tempfile.mkdtemp()
         spreadsheet_rows = []
         zip_buf = io.BytesIO()
@@ -111,11 +114,10 @@ if submitted and uploaded_files and who:
                             img_tmp.seek(0)
                             with open(img_tmp.name, "rb") as imgf:
                                 img_data = imgf.read()
-                        # You could crop here if desired (but usually PDFs are scanned, so optional)
                         receipt_data = parse_receipt_with_openai(img_data, RECEIPT_PROMPT)
                         if receipt_data:
                             spreadsheet_rows.append(receipt_data)
-                            new_name = rename_file(receipt_data, who, ".jpg")
+                            new_name = rename_file(receipt_data, ".jpg")
                             zipf.writestr(new_name, img_data)
                 else:
                     img_bytes = uploaded_file.read()
@@ -123,16 +125,14 @@ if submitted and uploaded_files and who:
                     receipt_data = parse_receipt_with_openai(cropped_bytes, RECEIPT_PROMPT)
                     if receipt_data:
                         spreadsheet_rows.append(receipt_data)
-                        new_name = rename_file(receipt_data, who, ext)
+                        new_name = rename_file(receipt_data, ext)
                         zipf.writestr(new_name, cropped_bytes)
-            # Save spreadsheet
             df = pd.DataFrame(spreadsheet_rows)
             sheet_bytes = io.BytesIO()
             df.to_excel(sheet_bytes, index=False)
-            zipf.writestr(f"{who} Expenses Detail.xlsx", sheet_bytes.getvalue())
+            zipf.writestr("Receipts Summary.xlsx", sheet_bytes.getvalue())
         zip_buf.seek(0)
-        st.success("Receipts processed and zipped! Download below.")
-        st.download_button("Download ZIP", zip_buf, file_name=f"Processed_Receipts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
+        st.success("Done! Download your processed receipts below.")
+        st.download_button("Download ZIP", zip_buf, file_name=f"Receipts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
 else:
-    st.info("Please upload files and enter the name before clicking Process Receipts.")
-
+    st.info("Please upload files to begin.")
