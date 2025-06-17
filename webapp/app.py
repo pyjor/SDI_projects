@@ -17,7 +17,7 @@ import io
 # ======= CONFIG =======
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-PROMPT_FILE = "receipt_prompt.txt"
+PROMPT_FILE = "webapp/receipt_prompt.txt"
 with open(PROMPT_FILE, "r", encoding="utf-8") as f:
     RECEIPT_PROMPT = f.read()
 
