@@ -57,4 +57,5 @@ def parse_receipt_with_openai(image_bytes, prompt):
     return data
 
 def rename_file(data, ext):
-    def clean(s): return "".join([c]()
+    def clean(s): return "".join([c for c in str(s) if c.isalnum() or c in "-_ "])
+
