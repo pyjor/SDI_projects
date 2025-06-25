@@ -90,7 +90,7 @@ def rename_file(data, ext):
 
 # ========== STREAMLIT APP UI ==========
 
-st.title("SDI Receipt Reader)
+st.title("SDI Receipt Reader")
 st.markdown("Upload receipts. We'll extract the relevant info, rename the file, and give you everything in a ZIP + Excel report.")
 
 with st.form("upload_form"):
