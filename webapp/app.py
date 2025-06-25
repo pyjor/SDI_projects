@@ -90,11 +90,11 @@ def rename_file(data, ext):
 
 # ========== STREAMLIT APP UI ==========
 
-st.title("Receipt Parser – Cropping Disabled")
+st.title("SDI Receipt Reader)
 st.markdown("Upload receipts. We'll extract the relevant info, rename the file, and give you everything in a ZIP + Excel report.")
 
 with st.form("upload_form"):
-    uploaded_files = st.file_uploader("Upload receipts (images or PDFs)", type=["jpg", "jpeg", "png", "webp", "pdf"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("Upload receipts (images or PDFs)", type=["jpg", "jpeg", "png", "webp"], accept_multiple_files=True)
     submitted = st.form_submit_button("Process Receipts")
 
 if submitted and uploaded_files:
