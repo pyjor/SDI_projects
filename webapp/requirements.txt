@@ -6,3 +6,7 @@ pandas
 pdf2image
 openpyxl
 matplotlib
+seaborn
+numpy
+Pillow
+pdf2image
