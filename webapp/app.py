@@ -1,3 +1,4 @@
+# SDI Services Combined App
 import streamlit as st
 import openai
 import os
@@ -13,126 +14,193 @@ from zipfile import ZipFile
 from pdf2image import convert_from_bytes
 import tempfile
 import io
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# ======= CONFIG =======
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# Streamlit page config
+st.set_page_config(page_title="SDI Services", layout="wide")
 
+# App selector
+st.markdown("""
+    <h1 style='text-align: center; color: white;'>SDI SERVICES</h1>
+""", unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    app1_btn = st.button("APP 1")
+    app3_btn = st.button("APP 3")
+    app5_btn = st.button("APP 5")
+
+with col2:
+    app2_btn = st.button("APP 2")
+    app4_btn = st.button("APP 4")
+    app6_btn = st.button("APP 6")
+
+# Load prompt file only once
 PROMPT_FILE = "webapp/receipt_prompt.txt"
 with open(PROMPT_FILE, "r", encoding="utf-8") as f:
     RECEIPT_PROMPT = f.read()
 
-# ========= FUNCTIONS ==========
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-def extract_json_from_response(text_response):
-    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text_response, re.DOTALL)
-    if match:
-        json_str = match.group(1)
-    else:
-        json_str = text_response.strip()
-    return json_str
+# =================== APP 1 ===================
+def app1():
+    st.title("SDI Receipt Reader")
+    st.markdown("Upload receipts. We'll extract the relevant info, rename the file, and give you everything in a ZIP + Excel report.")
 
-def parse_receipt_with_openai(image_bytes, prompt):
-    base64_image = base64.b64encode(image_bytes).decode("utf-8")
-    response = openai.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "system", "content": prompt},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Extract the receipt info as described."},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                ]
-            }
-        ],
-        max_tokens=512
-    )
-    text_response = response.choices[0].message.content
-    try:
-        json_str = extract_json_from_response(text_response)
-        data = json.loads(json_str)
-    except Exception as e:
-        st.warning(f"Error parsing JSON: {e}\nRaw: {text_response}")
-        data = None
-    return data
+    def extract_json_from_response(text_response):
+        match = re.search(r"```(?:json)?\\s*(\{.*?\})\\s*```", text_response, re.DOTALL)
+        json_str = match.group(1) if match else text_response.strip()
+        return json_str
 
-def crop_receipt_image(image_bytes):
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    orig = image.copy()
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY_INV)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
-        return image_bytes
-    largest = max(contours, key=cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(largest)
-    if w * h < 0.15 * image.shape[0] * image.shape[1]:
-        return image_bytes
-    cropped = orig[y:y+h, x:x+w]
-    is_success, buffer = cv2.imencode(".jpg", cropped)
-    return buffer.tobytes() if is_success else image_bytes
+    def parse_receipt_with_openai(image_bytes, prompt):
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
+        response = openai.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extract the receipt info as described."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                    ]
+                }
+            ],
+            max_tokens=512
+        )
+        text_response = response.choices[0].message.content
+        try:
+            json_str = extract_json_from_response(text_response)
+            data = json.loads(json_str)
+        except Exception as e:
+            st.warning(f"Error parsing JSON: {e}\nRaw: {text_response}")
+            data = None
+        return data
 
-def rename_file(data, ext):
-    def clean(s): return "".join([c for c in str(s) if c.isalnum() or c in "-_ "])
-    
-    date = data.get('Date', '') or ' '
-    payee = data.get('Name', '') or ' '
-    ref = data.get('Ref', '') or ' '
-    project = data.get('Project', '') or ' '
-    payment_method = data.get('Payment Method', '') or ''
-    
-    match = re.search(r"\*+(\d{4})", payment_method)
-    last4 = match.group(1) if match else "XXXX"
-    
-    new_name = f"{date} CC{last4} {clean(payee)} Inv {clean(ref)} - {clean(project)}{ext}"
-    return new_name
+    def rename_file(data, ext):
+        def clean(s): return "".join([c for c in str(s) if c.isalnum() or c in "-_ "])
+        date = data.get('Date', '') or ' '
+        payee = data.get('Name', '') or ' '
+        ref = data.get('Ref', '') or ' '
+        project = data.get('Project', '') or ' '
+        payment_method = data.get('Payment Method', '') or ''
+        match = re.search(r"\\*+(\\d{4})", payment_method)
+        last4 = match.group(1) if match else "XXXX"
+        return f"{date} CC{last4} {clean(payee)} Inv {clean(ref)} - {clean(project)}{ext}"
 
-# ========== STREAMLIT APP UI ==========
+    with st.form("upload_form_app1"):
+        uploaded_files = st.file_uploader("Upload receipts (images or PDFs)", type=["jpg", "jpeg", "png", "webp"], accept_multiple_files=True, key="app1_uploader")
+        submitted = st.form_submit_button("Process Receipts")
 
-st.title("SDI Receipt Reader")
-st.markdown("Upload receipts. We'll extract the relevant info, rename the file, and give you everything in a ZIP + Excel report.")
-
-with st.form("upload_form"):
-    uploaded_files = st.file_uploader("Upload receipts (images or PDFs)", type=["jpg", "jpeg", "png", "webp"], accept_multiple_files=True)
-    submitted = st.form_submit_button("Process Receipts")
-
-if submitted and uploaded_files:
-    with st.spinner("Processing receipts..."):
-        out_dir = tempfile.mkdtemp()
-        spreadsheet_rows = []
-        zip_buf = io.BytesIO()
-        with ZipFile(zip_buf, "w") as zipf:
-            for uploaded_file in uploaded_files:
-                ext = os.path.splitext(uploaded_file.name)[-1].lower()
-                if ext == ".pdf":
-                    pdf_bytes = uploaded_file.read()
-                    images = convert_from_bytes(pdf_bytes, fmt="jpeg")
-                    for idx, img in enumerate(images):
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as img_tmp:
-                            img.save(img_tmp.name, format="JPEG")
-                            img_tmp.seek(0)
-                            with open(img_tmp.name, "rb") as imgf:
-                                img_data = imgf.read()
-                        receipt_data = parse_receipt_with_openai(img_data, RECEIPT_PROMPT)
-                        if receipt_data:
-                            spreadsheet_rows.append(receipt_data)
-                            new_name = rename_file(receipt_data, ".jpg")
-                            zipf.writestr(new_name, img_data)
-                else:
+    if submitted and uploaded_files:
+        with st.spinner("Processing receipts..."):
+            out_dir = tempfile.mkdtemp()
+            spreadsheet_rows = []
+            zip_buf = io.BytesIO()
+            with ZipFile(zip_buf, "w") as zipf:
+                for uploaded_file in uploaded_files:
+                    ext = os.path.splitext(uploaded_file.name)[-1].lower()
                     img_bytes = uploaded_file.read()
-                    cropped_bytes = img_bytes  # ← Cropping is disabled
-                    receipt_data = parse_receipt_with_openai(cropped_bytes, RECEIPT_PROMPT)
+                    receipt_data = parse_receipt_with_openai(img_bytes, RECEIPT_PROMPT)
                     if receipt_data:
                         spreadsheet_rows.append(receipt_data)
                         new_name = rename_file(receipt_data, ext)
-                        zipf.writestr(new_name, cropped_bytes)
-            df = pd.DataFrame(spreadsheet_rows)
-            sheet_bytes = io.BytesIO()
-            df.to_excel(sheet_bytes, index=False)
-            zipf.writestr("Receipts Summary.xlsx", sheet_bytes.getvalue())
-        zip_buf.seek(0)
-        st.success("Done! Download your processed receipts below.")
-        st.download_button("Download ZIP", zip_buf, file_name=f"Receipts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
+                        zipf.writestr(new_name, img_bytes)
+                df_receipts = pd.DataFrame(spreadsheet_rows)
+                sheet_bytes = io.BytesIO()
+                df_receipts.to_excel(sheet_bytes, index=False)
+                zipf.writestr("Receipts Summary.xlsx", sheet_bytes.getvalue())
+            zip_buf.seek(0)
+            st.success("Done! Download your processed receipts below.")
+            st.download_button("Download ZIP", zip_buf, file_name=f"Receipts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
+
+# =================== APP 2 ===================
+def app2():
+    st.title("QuickBooks PnL Project Extractor")
+    st.subheader("All Excel Files MUST be in Numeric Format")
+
+    def extract_with_month_from_b6(file_obj, file_name):
+        df_excel = pd.read_excel(file_obj, sheet_name=0, header=None)
+        project_names = df_excel.iloc[4, 1:].fillna("").astype(str).str.strip()
+        valid_cols = [i for i, name in enumerate(project_names, start=1) if name and "total" not in name.lower() and "(" in name and ")" in name]
+        month_cell = df_excel.iloc[5, 1]
+        month = str(month_cell).strip() if pd.notna(month_cell) else file_name
+        sales_row_index = df_excel[df_excel.iloc[:, 0].astype(str).str.strip() == "61100 Contract Sales"].index
+        cogs_row_index = df_excel[df_excel.iloc[:, 0].astype(str).str.strip() == "Total Cost of Goods Sold"].index
+        if not sales_row_index.empty and not cogs_row_index.empty:
+            sales_row = df_excel.iloc[sales_row_index[0], valid_cols].fillna(0).astype(float)
+            cogs_row = df_excel.iloc[cogs_row_index[0], valid_cols].fillna(0).astype(float)
+            sales_df = pd.DataFrame({'Project': [project_names[i] + " - Income" for i in valid_cols], month: sales_row.values})
+            cogs_df = pd.DataFrame({'Project': [project_names[i] + " - Cost" for i in valid_cols], month: cogs_row.values})
+            return pd.concat([sales_df, cogs_df], axis=0).reset_index(drop=True)
+        return pd.DataFrame()
+
+    uploaded_files2 = st.file_uploader("Upload one or more Excel files", type=["xlsx"], accept_multiple_files=True, key="app2_uploader")
+
+    if uploaded_files2:
+        all_data = []
+        for file in uploaded_files2:
+            result = extract_with_month_from_b6(file, file.name)
+            all_data.append(result)
+
+        combined_df = pd.concat(all_data, axis=0)
+        pivot_df = combined_df.pivot_table(index="Project", aggfunc='first').fillna(0)
+
+        profit_dict = {}
+        projects = set(idx.replace(" - Income", "").replace(" - Cost", "") for idx in pivot_df.index)
+        for project in projects:
+            income_key = project + " - Income"
+            cost_key = project + " - Cost"
+            income_row = pivot_df.loc[income_key] if income_key in pivot_df.index else pd.Series(0, index=pivot_df.columns)
+            cost_row = pivot_df.loc[cost_key] if cost_key in pivot_df.index else pd.Series(0, index=pivot_df.columns)
+            profit_dict[project] = income_row - cost_row
+
+        profit_df = pd.DataFrame.from_dict(profit_dict, orient='index').fillna(0)
+        profit_df.index.name = "Project"
+        pivot_df.loc["Total"] = pivot_df.sum()
+        profit_df.loc["Total"] = profit_df.sum()
+
+        st.success("AWESOME, Data processed successfully!")
+        st.subheader("📌 Project Summary Table")
+        st.dataframe(pivot_df.style.format("${:,.2f}"))
+
+        st.subheader("📌 Profit and Loss Table")
+        styled_profit_df = profit_df.style.format("${:,.2f}").applymap(lambda val: "background-color: #ffe6e6" if val < 0 else "")
+        st.dataframe(styled_profit_df)
+
+        with st.expander("📈 Show Project Charts"):
+            selected_project = st.selectbox("Choose a project:", sorted(projects))
+            if st.button("Generate Charts"):
+                income_key = selected_project + " - Income"
+                cost_key = selected_project + " - Cost"
+                income_series = pivot_df.loc[income_key] if income_key in pivot_df.index else pd.Series(0, index=pivot_df.columns)
+                cost_series = pivot_df.loc[cost_key] if cost_key in pivot_df.index else pd.Series(0, index=pivot_df.columns)
+                df_plot = pd.DataFrame({
+                    'Month': pivot_df.columns,
+                    'Income': income_series.values,
+                    'Cost': cost_series.values,
+                    'Net Profit': income_series.values - cost_series.values,
+                    'Margin %': ((income_series.values - cost_series.values) / income_series.replace(0, float('nan')).values) * 100
+                })
+                st.line_chart(df_plot.set_index('Month')[['Income', 'Cost']])
+                st.bar_chart(df_plot.set_index('Month')['Net Profit'])
+                st.line_chart(df_plot.set_index('Month')['Margin %'])
+
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            pivot_df.to_excel(writer, index=True, sheet_name='Project Summary')
+            profit_df.to_excel(writer, index=True, sheet_name='Profit and Loss')
+
+        st.download_button("📥 Download Excel File", data=buffer.getvalue(), file_name="project_summary.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    else:
+        st.info("Please upload at least one Excel file to begin.")
+
+# ========== Show App Based on Button Click ==========
+if app1_btn:
+    app1()
+elif app2_btn:
+    app2()
 else:
-    st.info("Please upload files to begin.")
+    st.markdown("<h3 style='text-align: center; color: gray;'>Select a service to begin.</h3>", unsafe_allow_html=True)
