@@ -5,3 +5,4 @@ pillow
 pandas
 pdf2image
 openpyxl
+matplotlib
