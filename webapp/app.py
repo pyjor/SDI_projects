@@ -20,22 +20,44 @@ import seaborn as sns
 # Streamlit page config
 st.set_page_config(page_title="SDI Services", layout="wide")
 
-# App selector
+# Centered layout with custom button grid
 st.markdown("""
     <h1 style='text-align: center; color: white;'>SDI SERVICES</h1>
+    <style>
+        div.button-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 50px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+        div.button-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        button[kind="primary"] {
+            border-radius: 30px !important;
+            padding: 10px 30px !important;
+        }
+    </style>
+    <div class='button-container'>
+        <div class='button-column'>
+            <form action="/?app=app1" method="get"><button kind="primary">APP 1</button></form>
+            <form action="/?app=app3" method="get"><button kind="primary">APP 3</button></form>
+            <form action="/?app=app5" method="get"><button kind="primary">APP 5</button></form>
+        </div>
+        <div class='button-column'>
+            <form action="/?app=app2" method="get"><button kind="primary">APP 2</button></form>
+            <form action="/?app=app4" method="get"><button kind="primary">APP 4</button></form>
+            <form action="/?app=app6" method="get"><button kind="primary">APP 6</button></form>
+        </div>
+    </div>
 """, unsafe_allow_html=True)
 
-col1, col2 = st.columns(2)
-
-with col1:
-    app1_btn = st.button("APP 1")
-    app3_btn = st.button("APP 3")
-    app5_btn = st.button("APP 5")
-
-with col2:
-    app2_btn = st.button("APP 2")
-    app4_btn = st.button("APP 4")
-    app6_btn = st.button("APP 6")
+query_params = st.experimental_get_query_params()
+selected_app = query_params.get("app", [None])[0]
 
 # Load prompt file only once
 PROMPT_FILE = "webapp/receipt_prompt.txt"
@@ -198,9 +220,9 @@ def app2():
         st.info("Please upload at least one Excel file to begin.")
 
 # ========== Show App Based on Button Click ==========
-if app1_btn:
+if selected_app == "app1":
     app1()
-elif app2_btn:
+elif selected_app == "app2":
     app2()
 else:
     st.markdown("<h3 style='text-align: center; color: gray;'>Select a service to begin.</h3>", unsafe_allow_html=True)
