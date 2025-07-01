@@ -56,7 +56,8 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-query_params = st.experimental_get_query_params()
+query_params = st.query_params
+
 selected_app = query_params.get("app", [None])[0]
 
 # Load prompt file only once
