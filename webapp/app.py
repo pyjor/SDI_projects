@@ -220,7 +220,7 @@ def main_menu():
     col1, col2 = st.columns([1,1], gap="large")
 
     with col1:
-        if st.button("APP 1"):
+        if st.button("Receipt Reader and Renamer"):
             st.session_state.active_app = 1
             st.rerun()
         if st.button("APP 3"):
@@ -229,7 +229,7 @@ def main_menu():
             st.info("Coming soon…")
 
     with col2:
-        if st.button("APP 2"):
+        if st.button("PnL By Project Analyzer"):
             st.session_state.active_app = 2
             st.rerun()
         if st.button("APP 4"):
