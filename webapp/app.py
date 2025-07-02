@@ -207,3 +207,41 @@ def main_menu():
         <style>
         body { background-color: #000000; color: #ffffff; }
         .button-grid  { display: flex; flex-wrap: wrap; justify-content: center; gap: 40px; margin-top:40px;}
+        .button-col   { display: flex; flex-direction: column; gap: 30px;}
+        div.stButton > button {
+            background: #ffffff; color:#000; border:none; border-radius:30px; padding:18px 60px;
+            font-weight:700; letter-spacing:3px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("<h1 style='text-align:center; letter-spacing:8px;'>SDI SERVICES</h1>", unsafe_allow_html=True)
+    col1, col2 = st.columns([1,1], gap="large")
+
+    with col1:
+        if st.button("APP 1"):
+            st.session_state.active_app = 1
+            st.experimental_rerun()
+        if st.button("APP 3"):
+            st.info("Coming soon…")
+        if st.button("APP 5"):
+            st.info("Coming soon…")
+
+    with col2:
+        if st.button("APP 2"):
+            st.session_state.active_app = 2
+            st.experimental_rerun()
+        if st.button("APP 4"):
+            st.info("Coming soon…")
+        if st.button("APP 6"):
+            st.info("Coming soon…")
+
+
+# ─────────── ROUTER ───────────
+if st.session_state.active_app == 1:
+    receipt_reader_app()
+elif st.session_state.active_app == 2:
+    pnl_summary_app()
+else:
+    main_menu()
