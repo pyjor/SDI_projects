@@ -222,7 +222,7 @@ def main_menu():
     with col1:
         if st.button("APP 1"):
             st.session_state.active_app = 1
-            st.experimental_rerun()
+            st.rerun()
         if st.button("APP 3"):
             st.info("Coming soon…")
         if st.button("APP 5"):
@@ -231,7 +231,7 @@ def main_menu():
     with col2:
         if st.button("APP 2"):
             st.session_state.active_app = 2
-            st.experimental_rerun()
+            st.rerun()
         if st.button("APP 4"):
             st.info("Coming soon…")
         if st.button("APP 6"):
