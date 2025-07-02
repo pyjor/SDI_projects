@@ -56,9 +56,9 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-query_params = st.query_params
+query_params = st.query_params           # Streamlit ≥1.33+
+selected_app = query_params.get("app")   # now returns e.g. "app1" or None
 
-selected_app = query_params.get("app", [None])[0]
 
 # Load prompt file only once
 PROMPT_FILE = "webapp/receipt_prompt.txt"
