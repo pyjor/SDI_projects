@@ -12,6 +12,30 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import openai
 
+##PASWWORD
+# ─────────── AUTHENTICATION ───────────
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+def login_screen():
+    st.markdown("<h2 style='text-align:center;'>🔐 SDI SERVICES – Login</h2>", unsafe_allow_html=True)
+    with st.form("login_form", clear_on_submit=False):
+        pwd = st.text_input("Enter password", type="password")
+        submitted = st.form_submit_button("Enter")
+        if submitted:
+            if pwd == st.secrets["PASSWORD_SDI_ENTER"]:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("❌ Incorrect password")
+
+if not st.session_state.authenticated:
+    login_screen()
+    st.stop()        # stops execution here until the correct password is entered
+# ──────────────────────────────────────
+
+
+
 # ─────────── GLOBAL CONFIG ───────────
 st.set_page_config(page_title="SDI SERVICES", layout="wide", initial_sidebar_state="collapsed")
 openai.api_key = st.secrets["OPENAI_API_KEY"]
