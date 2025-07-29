@@ -194,89 +194,101 @@ def pnl_summary_app():
 # ─────────── APP 3 – QuickBooks Expenses Importer ───────────
 def expense_importer_app():
     st.title("App 3: Importer")
-    st.markdown("Upload receipt images or PDFs. You’ll get a ZIP containing renamed images and an Excel formatted for QBO import.")
-
-    def _parse_receipt(img_bytes, prompt):
-        b64 = base64.b64encode(img_bytes).decode("utf-8")
-        resp = openai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": prompt},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Extract the receipt info as described."},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
-                    ]
-                }
-            ],
-            max_tokens=512
-        )
-        return json.loads(_extract_json_from_response(resp.choices[0].message.content))
-
-    def _rename(data, ext):
-        clean = lambda s: "".join(c for c in str(s) if c.isalnum() or c in "-_ ")
-        date    = data.get("Payment date", "") or "nodate"
-        payee   = clean(data.get("Payee", "") or "nopayee")
-        ref     = clean(data.get("Reference", "") or "noref")
-        project = clean(data.get("Project", "") or "")
-        return f"{date} {payee} Inv {ref} – {project}{ext}"
-
-    uploads = st.file_uploader(
-        "Upload receipts (images or PDFs)",
-        type=["jpg","jpeg","png","webp","pdf"],
-        accept_multiple_files=True
+    st.markdown(
+        "Upload receipt images or PDFs. You’ll get a ZIP containing renamed images "
+        "and an Excel formatted for QBO import."
     )
 
-    if uploads:
-        if st.button("Process Receipts 🚀"):
-            with st.spinner("Parsing receipts, please wait…"):
-                tmpdir = tempfile.mkdtemp()
-                summary = []
+    # ---------- FORM ----------
+    with st.form("import_form"):
+        uploads = st.file_uploader(
+            "Upload receipts (images or PDFs)",
+            type=["jpg", "jpeg", "png", "webp", "pdf"],
+            accept_multiple_files=True
+        )
+        submitted = st.form_submit_button("Process Receipts 🚀")  # always visible
+    # --------------------------
 
-                for f in uploads:
-                    ext = os.path.splitext(f.name)[-1].lower()
-                    def _handle(img_b):
-                        try:
-                            data = _parse_receipt(img_b, RECEIPT_PROMPT_APP3)
-                            new_name = _rename(data, ".jpg")
-                            with open(os.path.join(tmpdir, new_name), "wb") as im:
-                                im.write(img_b)
-                            summary.append(data)
-                        except Exception as e:
-                            st.error(f"❌ Error parsing {f.name}: {e}")
+    if submitted:
+        if not uploads:
+            st.warning("Please upload at least one file.")
+            return
 
-                    if ext == ".pdf":
-                        for pg in convert_from_bytes(f.read(), fmt="jpeg"):
-                            buf = io.BytesIO(); pg.save(buf, format="JPEG")
-                            _handle(buf.getvalue())
-                    else:
-                        _handle(f.read())
+        with st.spinner("Parsing receipts, please wait…"):
+            tmpdir = tempfile.mkdtemp()
+            summary = []
 
-                df_sum = pd.DataFrame(summary)
-                excel_b = io.BytesIO(); df_sum.to_excel(excel_b, index=False)
-                with open(os.path.join(tmpdir, "QBO Importer.xlsx"), "wb") as xl:
-                    xl.write(excel_b.getvalue())
+            def _parse_receipt(img_bytes):
+                b64 = base64.b64encode(img_bytes).decode("utf-8")
+                resp = openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": RECEIPT_PROMPT_APP3},
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": "Extract the receipt info as described."},
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
+                            ]
+                        }
+                    ],
+                    max_tokens=512
+                )
+                return json.loads(_extract_json_from_response(resp.choices[0].message.content))
 
-                # zip
-                buf_zip = io.BytesIO()
-                with ZipFile(buf_zip, "w") as z:
-                    for root, _, files in os.walk(tmpdir):
-                        for fn in files:
-                            path = os.path.join(root, fn)
-                            z.write(path, fn)
-                buf_zip.seek(0)
+            def _rename(data, ext):
+                clean = lambda s: "".join(c for c in str(s) if c.isalnum() or c in "-_ ")
+                date    = data.get("Payment date", "") or "nodate"
+                payee   = clean(data.get("Payee", "") or "nopayee")
+                ref     = clean(data.get("Reference", "") or "noref")
+                project = clean(data.get("Project", "") or "")
+                return f"{date} {payee} Inv {ref} – {project}{ext}"
 
-            st.success("Done! Download your ZIP below.")
-            st.download_button(
-                "📦 Download Processed ZIP",
-                buf_zip,
-                file_name=f"Processed_Receipts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-            )
+            for f in uploads:
+                ext = os.path.splitext(f.name)[-1].lower()
+
+                def _handle(img_b):
+                    try:
+                        data = _parse_receipt(img_b)
+                        new_name = _rename(data, ".jpg")
+                        with open(os.path.join(tmpdir, new_name), "wb") as im:
+                            im.write(img_b)
+                        summary.append(data)
+                    except Exception as e:
+                        st.error(f"❌ Error parsing {f.name}: {e}")
+
+                if ext == ".pdf":
+                    for pg in convert_from_bytes(f.read(), fmt="jpeg"):
+                        buf = io.BytesIO(); pg.save(buf, format="JPEG")
+                        _handle(buf.getvalue())
+                else:
+                    _handle(f.read())
+
+            # build Excel
+            df_sum = pd.DataFrame(summary)
+            excel_buf = io.BytesIO(); df_sum.to_excel(excel_buf, index=False)
+            with open(os.path.join(tmpdir, "QBO Importer.xlsx"), "wb") as xl:
+                xl.write(excel_buf.getvalue())
+
+            # zip folder
+            zip_buf = io.BytesIO()
+            with ZipFile(zip_buf, "w") as z:
+                for root, _, files in os.walk(tmpdir):
+                    for fn in files:
+                        z.write(os.path.join(root, fn), fn)
+            zip_buf.seek(0)
+
+        st.success("Done! Download your ZIP below.")
+        st.download_button(
+            "📦 Download Processed ZIP",
+            zip_buf,
+            file_name=f"Processed_Receipts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        )
 
     if st.button("⬅️  Main menu"):
         st.session_state.active_app = None
         st.rerun()
+
 
 # ─────────── MAIN MENU UI ───────────
 def main_menu():
