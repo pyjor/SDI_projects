@@ -75,7 +75,7 @@ account_names = [
     "31042 SDI Credit Cards:Zee CC 7500"
 ]
 
-for example if you find in the receipt that the transaction was made with a credit card ending 0861 that means it is "Payment account": "31053 SDI Credit Cards:Richard CC 0861". If
+for example if you find in the receipt that the transaction was made with a credit card ending 0861 that means it is "Payment account": "31053 SDI Credit Cards:Richard CC 0861" another example if a transaction was made with a credit card ending 7466 that means it is "Payment account": "31065 SDI Credit Cards:Carl CC 7466", please ALWAYS use the list above 'account_names'  never add another credit card that is not in the list, but If
 you really really really can't find the right credit card then it would be "31062 SDI Credit Cards:Credit Card" this in the worst case when you couldn't find the right credit card
 
 --
