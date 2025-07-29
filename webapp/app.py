@@ -199,58 +199,69 @@ def expense_importer_app():
         "and an Excel formatted for QBO import."
     )
 
-    # ---------- FORM ----------
+    # -------------- helpers --------------
+    def _parse_receipt(img_bytes):
+        b64 = base64.b64encode(img_bytes).decode("utf-8")
+        resp = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": RECEIPT_PROMPT_APP3},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extract the receipt info as described."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
+                    ]
+                }
+            ],
+            max_tokens=512
+        )
+        return json.loads(_extract_json_from_response(resp.choices[0].message.content))
+
+    def _rename(data, ext):
+        clean = lambda s: "".join(c for c in str(s) if c.isalnum() or c in "-_ ")
+        date    = data.get("Payment date", "") or "nodate"
+        payee   = clean(data.get("Payee", "") or "nopayee")
+        ref     = clean(data.get("Reference", "") or "noref")
+        project = clean(data.get("Project", "") or "")
+        return f"{date} {payee} Inv {ref} – {project}{ext}"
+
+    def _ensure_jpg(img_bytes, orig_ext):
+        """Return (jpg_bytes, '.jpg'), converting if needed."""
+        if orig_ext in (".jpg", ".jpeg"):
+            return img_bytes, ".jpg"
+        # convert with Pillow
+        from PIL import Image
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=90)
+        return buf.getvalue(), ".jpg"
+    # -------------------------------------
+
+    # Always-visible uploader + button (form)
     with st.form("import_form"):
         uploads = st.file_uploader(
             "Upload receipts (images or PDFs)",
-            type=["jpg", "jpeg", "png", "webp", "pdf"],
+            type=None,                   # ← accept anything
             accept_multiple_files=True
         )
-        submitted = st.form_submit_button("Process Receipts 🚀")  # always visible
-    # --------------------------
+        submitted = st.form_submit_button("Process Receipts 🚀")
 
     if submitted:
         if not uploads:
-            st.warning("Please upload at least one file.")
-            return
+            st.warning("Please upload at least one file."); return
 
         with st.spinner("Parsing receipts, please wait…"):
-            tmpdir = tempfile.mkdtemp()
+            tmpdir  = tempfile.mkdtemp()
             summary = []
-
-            def _parse_receipt(img_bytes):
-                b64 = base64.b64encode(img_bytes).decode("utf-8")
-                resp = openai.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": RECEIPT_PROMPT_APP3},
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": "Extract the receipt info as described."},
-                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
-                            ]
-                        }
-                    ],
-                    max_tokens=512
-                )
-                return json.loads(_extract_json_from_response(resp.choices[0].message.content))
-
-            def _rename(data, ext):
-                clean = lambda s: "".join(c for c in str(s) if c.isalnum() or c in "-_ ")
-                date    = data.get("Payment date", "") or "nodate"
-                payee   = clean(data.get("Payee", "") or "nopayee")
-                ref     = clean(data.get("Reference", "") or "noref")
-                project = clean(data.get("Project", "") or "")
-                return f"{date} {payee} Inv {ref} – {project}{ext}"
 
             for f in uploads:
                 ext = os.path.splitext(f.name)[-1].lower()
 
-                def _handle(img_b):
+                def _handle(img_b, std_ext):
                     try:
                         data = _parse_receipt(img_b)
-                        new_name = _rename(data, ".jpg")
+                        new_name = _rename(data, std_ext)
                         with open(os.path.join(tmpdir, new_name), "wb") as im:
                             im.write(img_b)
                         summary.append(data)
@@ -260,17 +271,18 @@ def expense_importer_app():
                 if ext == ".pdf":
                     for pg in convert_from_bytes(f.read(), fmt="jpeg"):
                         buf = io.BytesIO(); pg.save(buf, format="JPEG")
-                        _handle(buf.getvalue())
+                        _handle(buf.getvalue(), ".jpg")
                 else:
-                    _handle(f.read())
+                    img_b, std_ext = _ensure_jpg(f.read(), ext)  # convert if needed
+                    _handle(img_b, std_ext)
 
-            # build Excel
+            # Excel summary
             df_sum = pd.DataFrame(summary)
             excel_buf = io.BytesIO(); df_sum.to_excel(excel_buf, index=False)
             with open(os.path.join(tmpdir, "QBO Importer.xlsx"), "wb") as xl:
                 xl.write(excel_buf.getvalue())
 
-            # zip folder
+            # ZIP everything
             zip_buf = io.BytesIO()
             with ZipFile(zip_buf, "w") as z:
                 for root, _, files in os.walk(tmpdir):
