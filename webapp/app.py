@@ -292,19 +292,19 @@ def main_menu():
         """,
         unsafe_allow_html=True,
     )
-    st.markdown("<h1 style='text-align:center; letter-spacing:8px;'>SDI SERVICES</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center; letter-spacing:8px;'>SDI SERVICES - BETA VERSION</h1>", unsafe_allow_html=True)
     col1, col2 = st.columns([1,1], gap="large")
 
     with col1:
-        if st.button("Receipt Reader & Renamer"):
+        if st.button("App1: Receipt Renamer"):
             st.session_state.active_app = 1; st.rerun()
-        if st.button("QuickBooks Expenses Importer"):
+        if st.button("App2: Importer"):
             st.session_state.active_app = 3; st.rerun()
         if st.button("APP 5"):
             st.info("Coming soon…")
 
     with col2:
-        if st.button("P&L By Project Analyzer"):
+        if st.button("App 2: [Not working]"):
             st.session_state.active_app = 2; st.rerun()
         if st.button("APP 4"):
             st.info("Coming soon…")
