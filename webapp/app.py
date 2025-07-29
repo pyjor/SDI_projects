@@ -56,7 +56,7 @@ def _extract_json_from_response(text_response: str):
 
 # ─────────── APP 1 – Receipt Reader & Renamer ───────────
 def receipt_reader_app():
-    st.title("Receipt Reader & Renamer")
+    st.title("App 1: Receipt Renamer")
     st.markdown("Upload your receipts (images or PDFs). We’ll extract the data, rename the files, and return a ZIP + Excel summary.")
 
     def _parse_receipt(image_bytes, prompt):
@@ -130,7 +130,7 @@ def receipt_reader_app():
 
 # ─────────── APP 2 – P&L by Project Analyzer ───────────
 def pnl_summary_app():
-    st.title("QuickBooks P&L Project Summary")
+    st.title("App 2: P&L by Project [Not Working]")
     st.markdown("Upload one or more **numeric‑formatted** QuickBooks P&L by Customer reports.")
 
     def _extract_with_month_from_b6(file_obj, file_name):
@@ -193,7 +193,7 @@ def pnl_summary_app():
 
 # ─────────── APP 3 – QuickBooks Expenses Importer ───────────
 def expense_importer_app():
-    st.title("QuickBooks Expenses Importer")
+    st.title("App 3: Importer")
     st.markdown("Upload receipt images or PDFs. You’ll get a ZIP containing renamed images and an Excel formatted for QBO import.")
 
     def _parse_receipt(img_bytes, prompt):
