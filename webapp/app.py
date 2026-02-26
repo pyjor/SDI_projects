@@ -62,7 +62,7 @@ def receipt_reader_app():
     def _parse_receipt(image_bytes, prompt):
         b64 = base64.b64encode(image_bytes).decode("utf-8")
         resp = openai.chat.completions.create(
-            model="gpt-4.1-mini",
+            model="gpt-5-mini",
             messages=[
                 {"role": "system", "content": prompt},
                 {
@@ -344,3 +344,4 @@ elif st.session_state.active_app == 3:
     expense_importer_app()
 else:
     main_menu()
+
