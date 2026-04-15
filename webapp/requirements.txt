@@ -10,3 +10,4 @@ seaborn
 numpy
 Pillow
 pdf2image
+openai-whisper
