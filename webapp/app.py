@@ -18,7 +18,7 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 def login_screen():
-    st.markdown("<h2 style='text-align:center;'>🔐 SDI SERVICES – Login</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;'>🔐 SDI MICRO-SERVICES – Login</h2>", unsafe_allow_html=True)
     with st.form("login_form", clear_on_submit=False):
         pwd = st.text_input("Enter password", type="password")
         submitted = st.form_submit_button("Enter")
@@ -34,7 +34,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ─────────── GLOBAL CONFIG ───────────
-st.set_page_config(page_title="SDI SERVICES", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="SDI MICRO-APPS", layout="wide", initial_sidebar_state="collapsed")
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 PROMPT_FILE_APP1 = "webapp/receipt_prompt.txt"
