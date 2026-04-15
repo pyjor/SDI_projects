@@ -299,21 +299,15 @@ def expense_importer_app():
 
 
 # ─────────── APP 4 – Audio Transcription ───────────
+# ─────────── APP 4 – Audio Transcription ───────────
 def audio_transcription_app():
     st.title("App 4: Audio Transcription")
     st.markdown("Upload an audio file and get a timestamped transcription as a downloadable `.txt` file.")
 
-    import whisper
-
     with st.form("transcription_form"):
         audio_file = st.file_uploader(
             "Upload your audio file",
-            type=["mp3", "wav", "m4a", "mp4", "flac", "ogg"]
-        )
-        model_size = st.selectbox(
-            "Whisper model (larger = slower but more accurate)",
-            ["base", "small", "medium"],
-            index=0
+            type=["mp3", "wav", "m4a", "mp4", "flac", "ogg", "webm"]
         )
         submitted = st.form_submit_button("Transcribe 🎙️")
 
@@ -323,13 +317,12 @@ def audio_transcription_app():
             return
 
         with st.spinner("Transcribing… this may take a few minutes depending on file length."):
-            # Save uploaded file to a temp path (Whisper needs a file path)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_file.name)[-1]) as tmp:
-                tmp.write(audio_file.read())
-                tmp_path = tmp.name
-
-            model = whisper.load_model(model_size)
-            result = model.transcribe(tmp_path)
+            result = openai.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                response_format="verbose_json",
+                timestamp_granularities=["segment"]
+            )
 
             # Format with timestamps
             def format_time(seconds):
@@ -340,20 +333,16 @@ def audio_transcription_app():
                 return f"{m}:{s:02d}"
 
             lines = []
-            for segment in result["segments"]:
+            for segment in result.segments:
                 timestamp = format_time(segment["start"])
                 text = segment["text"].strip()
                 lines.append(f"[{timestamp}] {text}")
 
             transcript = "\n".join(lines)
 
-            # Clean up temp file
-            os.unlink(tmp_path)
-
         st.success("Transcription complete!")
         st.text_area("Preview", transcript, height=400)
 
-        # Download as .txt
         output_name = os.path.splitext(audio_file.name)[0] + "_transcript.txt"
         st.download_button(
             "📥 Download Transcription (.txt)",
@@ -365,7 +354,6 @@ def audio_transcription_app():
     if st.button("⬅️  Main menu"):
         st.session_state.active_app = None
         st.rerun()
-
 
 # ─────────── MAIN MENU UI ───────────
 def main_menu():
