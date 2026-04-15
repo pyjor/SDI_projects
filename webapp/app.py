@@ -1,4 +1,4 @@
-# sdi_services.py   ── run with  ➜  streamlit run sdi_services.py
+# sdi_services.py   ──  run with  ➜  streamlit run sdi_services.py
 import streamlit as st
 import os, io, re, json, base64, tempfile
 from datetime import datetime
@@ -6,8 +6,8 @@ from zipfile import ZipFile
 from pathlib import Path
 import pandas as pd
 import numpy as np
-import cv2                                  # still used by APP 1 crop helper
-from pdf2image import convert_from_bytes    # used by APP 1 & APP 3
+import cv2                                  # still used by APP 1 crop helper
+from pdf2image import convert_from_bytes    # used by APP 1 & APP 3
 from PIL import Image
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -54,10 +54,10 @@ def _extract_json_from_response(text_response: str):
     match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text_response, re.DOTALL)
     return match.group(1) if match else text_response.strip()
 
-# ─────────── APP 1 – Receipt Reader & Renamer ───────────
+# ─────────── APP 1 – Receipt Reader & Renamer ───────────
 def receipt_reader_app():
     st.title("App 1: Receipt Renamer")
-    st.markdown("Upload your receipts (images or PDFs). We’ll extract the data, rename the files, and return a ZIP + Excel summary.")
+    st.markdown("Upload your receipts (images or PDFs). We'll extract the data, rename the files, and return a ZIP + Excel summary.")
 
     def _parse_receipt(image_bytes, prompt):
         b64 = base64.b64encode(image_bytes).decode("utf-8")
@@ -128,7 +128,7 @@ def receipt_reader_app():
         st.session_state.active_app = None
         st.rerun()
 
-# ─────────── APP 2 – P&L by Project Analyzer ───────────
+# ─────────── APP 2 – P&L by Project Analyzer ───────────
 def pnl_summary_app():
     st.title("App 2: P&L by Project [Not Working]")
     st.markdown("Upload one or more **numeric‑formatted** QuickBooks P&L by Customer reports.")
@@ -191,11 +191,11 @@ def pnl_summary_app():
         st.session_state.active_app = None
         st.rerun()
 
-# ─────────── APP 3 – QuickBooks Expenses Importer ───────────
+# ─────────── APP 3 – QuickBooks Expenses Importer ───────────
 def expense_importer_app():
     st.title("App 3: Importer")
     st.markdown(
-        "Upload receipt images or PDFs. You’ll get a ZIP containing renamed images "
+        "Upload receipt images or PDFs. You'll get a ZIP containing renamed images "
         "and an Excel formatted for QBO import."
     )
 
@@ -230,7 +230,6 @@ def expense_importer_app():
         """Return (jpg_bytes, '.jpg'), converting if needed."""
         if orig_ext in (".jpg", ".jpeg"):
             return img_bytes, ".jpg"
-        # convert with Pillow
         from PIL import Image
         img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
         buf = io.BytesIO()
@@ -238,11 +237,10 @@ def expense_importer_app():
         return buf.getvalue(), ".jpg"
     # -------------------------------------
 
-    # Always-visible uploader + button (form)
     with st.form("import_form"):
         uploads = st.file_uploader(
             "Upload receipts (images or PDFs)",
-            type=None,                   # ← accept anything
+            type=None,
             accept_multiple_files=True
         )
         submitted = st.form_submit_button("Process Receipts 🚀")
@@ -273,16 +271,14 @@ def expense_importer_app():
                         buf = io.BytesIO(); pg.save(buf, format="JPEG")
                         _handle(buf.getvalue(), ".jpg")
                 else:
-                    img_b, std_ext = _ensure_jpg(f.read(), ext)  # convert if needed
+                    img_b, std_ext = _ensure_jpg(f.read(), ext)
                     _handle(img_b, std_ext)
 
-            # Excel summary
             df_sum = pd.DataFrame(summary)
             excel_buf = io.BytesIO(); df_sum.to_excel(excel_buf, index=False)
             with open(os.path.join(tmpdir, "QBO Importer.xlsx"), "wb") as xl:
                 xl.write(excel_buf.getvalue())
 
-            # ZIP everything
             zip_buf = io.BytesIO()
             with ZipFile(zip_buf, "w") as z:
                 for root, _, files in os.walk(tmpdir):
@@ -295,6 +291,75 @@ def expense_importer_app():
             "📦 Download Processed ZIP",
             zip_buf,
             file_name=f"Processed_Receipts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        )
+
+    if st.button("⬅️  Main menu"):
+        st.session_state.active_app = None
+        st.rerun()
+
+
+# ─────────── APP 4 – Audio Transcription ───────────
+def audio_transcription_app():
+    st.title("App 4: Audio Transcription")
+    st.markdown("Upload an audio file and get a timestamped transcription as a downloadable `.txt` file.")
+
+    import whisper
+
+    with st.form("transcription_form"):
+        audio_file = st.file_uploader(
+            "Upload your audio file",
+            type=["mp3", "wav", "m4a", "mp4", "flac", "ogg"]
+        )
+        model_size = st.selectbox(
+            "Whisper model (larger = slower but more accurate)",
+            ["base", "small", "medium"],
+            index=0
+        )
+        submitted = st.form_submit_button("Transcribe 🎙️")
+
+    if submitted:
+        if not audio_file:
+            st.warning("Please upload an audio file.")
+            return
+
+        with st.spinner("Transcribing… this may take a few minutes depending on file length."):
+            # Save uploaded file to a temp path (Whisper needs a file path)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_file.name)[-1]) as tmp:
+                tmp.write(audio_file.read())
+                tmp_path = tmp.name
+
+            model = whisper.load_model(model_size)
+            result = model.transcribe(tmp_path)
+
+            # Format with timestamps
+            def format_time(seconds):
+                m, s = divmod(int(seconds), 60)
+                h, m = divmod(m, 60)
+                if h > 0:
+                    return f"{h}:{m:02d}:{s:02d}"
+                return f"{m}:{s:02d}"
+
+            lines = []
+            for segment in result["segments"]:
+                timestamp = format_time(segment["start"])
+                text = segment["text"].strip()
+                lines.append(f"[{timestamp}] {text}")
+
+            transcript = "\n".join(lines)
+
+            # Clean up temp file
+            os.unlink(tmp_path)
+
+        st.success("Transcription complete!")
+        st.text_area("Preview", transcript, height=400)
+
+        # Download as .txt
+        output_name = os.path.splitext(audio_file.name)[0] + "_transcript.txt"
+        st.download_button(
+            "📥 Download Transcription (.txt)",
+            transcript.encode("utf-8"),
+            file_name=output_name,
+            mime="text/plain"
         )
 
     if st.button("⬅️  Main menu"):
@@ -330,8 +395,8 @@ def main_menu():
     with col2:
         if st.button("App 2: [Not working]"):
             st.session_state.active_app = 2; st.rerun()
-        if st.button("APP 4"):
-            st.info("Coming soon…")
+        if st.button("App 4: Audio Transcription"):
+            st.session_state.active_app = 4; st.rerun()
         if st.button("APP 6"):
             st.info("Coming soon…")
 
@@ -342,6 +407,7 @@ elif st.session_state.active_app == 2:
     pnl_summary_app()
 elif st.session_state.active_app == 3:
     expense_importer_app()
+elif st.session_state.active_app == 4:
+    audio_transcription_app()
 else:
     main_menu()
-
