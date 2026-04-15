@@ -332,12 +332,12 @@ def audio_transcription_app():
                     return f"{h}:{m:02d}:{s:02d}"
                 return f"{m}:{s:02d}"
 
+            
             lines = []
             for segment in result.segments:
-                timestamp = format_time(segment["start"])
-                text = segment["text"].strip()
+                timestamp = format_time(segment.start)
+                text = segment.text.strip()
                 lines.append(f"[{timestamp}] {text}")
-
             transcript = "\n".join(lines)
 
         st.success("Transcription complete!")
