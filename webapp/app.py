@@ -111,19 +111,17 @@ def receipt_reader_app():
                         if data:
                             rows.append(data)
                             zipf.writestr(_rename_file(data, ext), img_bytes)
-
                 df = pd.DataFrame(rows)
                 xlsx = io.BytesIO(); df.to_excel(xlsx, index=False)
                 zipf.writestr("Receipts Summary.xlsx", xlsx.getvalue())
-
             zip_buf.seek(0)
-
         st.success("Done! Download everything below.")
         st.download_button(
             "Download ZIP",
             zip_buf,
             file_name=f"Receipts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
         )
+
     if st.button("⬅️  Main menu"):
         st.session_state.active_app = None
         st.rerun()
@@ -149,12 +147,10 @@ def pnl_summary_app():
         return pd.concat([sales_df, cogs_df], axis=0).reset_index(drop=True)
 
     files_up = st.file_uploader("Upload Excel files", type=["xlsx"], accept_multiple_files=True)
-
     if files_up:
         df_all = pd.concat([_extract_with_month_from_b6(f, f.name) for f in files_up], axis=0)
         piv = df_all.pivot_table(index="Project", aggfunc='first').fillna(0)
         projects = {i.replace(" - Income","").replace(" - Cost","") for i in piv.index}
-
         profit = {p: piv.loc.get(p+" - Income", pd.Series(0, index=piv.columns))
                     - piv.loc.get(p+" - Cost",   pd.Series(0, index=piv.columns))
                   for p in projects}
@@ -165,6 +161,7 @@ def pnl_summary_app():
         st.subheader("📌 Project Summary"); st.dataframe(piv.style.format("${:,.2f}"))
         st.subheader("📌 Profit & Loss");   st.dataframe(df_profit.style.format("${:,.2f}").applymap(
             lambda v: "background-color:#ffe6e6" if v<0 else ""))
+
         with st.expander("📈  Show project charts"):
             sel = st.selectbox("Choose a project", sorted(projects))
             if st.button("Generate charts"):
@@ -297,8 +294,6 @@ def expense_importer_app():
         st.session_state.active_app = None
         st.rerun()
 
-
-# ─────────── APP 4 – Audio Transcription ───────────
 # ─────────── APP 4 – Audio Transcription ───────────
 def audio_transcription_app():
     st.title("App 4: Audio Transcription")
@@ -316,13 +311,38 @@ def audio_transcription_app():
             st.warning("Please upload an audio file.")
             return
 
-        with st.spinner("Transcribing… this may take a few minutes depending on file length."):
-            result = openai.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                response_format="verbose_json",
-                timestamp_granularities=["segment"]
+        # Read bytes and check size (Whisper-1 has a 25 MB limit)
+        audio_bytes = audio_file.getvalue()
+        size_mb = len(audio_bytes) / (1024 * 1024)
+        if size_mb > 25:
+            st.error(
+                f"❌ File is {size_mb:.1f} MB. Whisper-1 has a 25 MB limit. "
+                "Please compress, trim, or split the file before uploading."
             )
+            return
+
+        with st.spinner("Transcribing… this may take a few minutes depending on file length."):
+            try:
+                # Pass as a (filename, bytes) tuple so the OpenAI SDK
+                # correctly identifies the format from the extension.
+                result = openai.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=(audio_file.name, audio_bytes),
+                    response_format="verbose_json",
+                    timestamp_granularities=["segment"]
+                )
+            except openai.BadRequestError as e:
+                st.error(f"❌ The API rejected the file (likely unsupported format or corrupted): {e}")
+                return
+            except openai.AuthenticationError as e:
+                st.error(f"❌ Authentication failed. Check your OPENAI_API_KEY in Streamlit secrets: {e}")
+                return
+            except openai.RateLimitError as e:
+                st.error(f"❌ Rate limit / quota exceeded: {e}")
+                return
+            except Exception as e:
+                st.error(f"❌ Transcription failed: {type(e).__name__}: {e}")
+                return
 
             # Format with timestamps
             def format_time(seconds):
@@ -332,7 +352,6 @@ def audio_transcription_app():
                     return f"{h}:{m:02d}:{s:02d}"
                 return f"{m}:{s:02d}"
 
-            
             lines = []
             for segment in result.segments:
                 timestamp = format_time(segment.start)
@@ -371,7 +390,6 @@ def main_menu():
     )
     st.markdown("<h1 style='text-align:center; letter-spacing:8px;'>SDI SERVICES - BETA VERSION</h1>", unsafe_allow_html=True)
     col1, col2 = st.columns([1,1], gap="large")
-
     with col1:
         if st.button("App1: Receipt Renamer"):
             st.session_state.active_app = 1; st.rerun()
@@ -379,7 +397,6 @@ def main_menu():
             st.session_state.active_app = 3; st.rerun()
         if st.button("APP 5"):
             st.info("Coming soon…")
-
     with col2:
         if st.button("App 2: [Not working]"):
             st.session_state.active_app = 2; st.rerun()
